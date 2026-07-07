@@ -1,0 +1,25 @@
+commodity,model,protocol,rmse_kes,mae_kes,r_squared,mape_pct
+Maize (KG, wholesale),Naive (previous month),fixed-split,4.224,2.763,-0.6138,7.59
+Maize (KG, wholesale),Naive (previous month),walk-forward,4.224,2.763,-0.6138,7.59
+Maize (KG, wholesale),Linear Regression,fixed-split,4.560,3.425,-0.8813,9.33
+Maize (KG, wholesale),Linear Regression,walk-forward,4.416,3.234,-0.7638,8.75
+Maize (KG, wholesale),Random Forest,fixed-split,4.485,4.274,-0.8201,12.09
+Maize (KG, wholesale),Random Forest,walk-forward,3.908,3.180,-0.3819,8.87
+Maize (KG, wholesale),LSTM,fixed-split,7.421,6.776,-3.9823,19.36
+Maize (KG, wholesale),LSTM,walk-forward,6.320,4.858,-2.6133,13.92
+Vegetable oil (1L, retail),Naive (previous month),fixed-split,12.753,8.075,0.6450,5.05
+Vegetable oil (1L, retail),Naive (previous month),walk-forward,12.753,8.075,0.6450,5.05
+Vegetable oil (1L, retail),Linear Regression,fixed-split,11.470,8.033,0.7129,5.13
+Vegetable oil (1L, retail),Linear Regression,walk-forward,11.032,6.997,0.7344,4.47
+Vegetable oil (1L, retail),Random Forest,fixed-split,24.035,16.891,-0.2608,11.16
+Vegetable oil (1L, retail),Random Forest,walk-forward,16.818,11.086,0.3827,7.28
+Vegetable oil (1L, retail),LSTM,fixed-split,24.122,16.594,-0.2700,11.00
+Vegetable oil (1L, retail),LSTM,walk-forward,14.581,10.079,0.5360,6.49
+Bread (400g, retail),Naive (previous month),fixed-split,0.894,0.667,-0.3433,1.52
+Bread (400g, retail),Naive (previous month),walk-forward,0.894,0.667,-0.3433,1.52
+Bread (400g, retail),Linear Regression,fixed-split,2.103,1.819,-6.4237,4.10
+Bread (400g, retail),Linear Regression,walk-forward,1.489,1.245,-2.7215,2.82
+Bread (400g, retail),Random Forest,fixed-split,0.869,0.706,-0.2674,1.61
+Bread (400g, retail),Random Forest,walk-forward,0.835,0.708,-0.1696,1.62
+Bread (400g, retail),LSTM,fixed-split,1.592,1.251,-3.2548,2.80
+Bread (400g, retail),LSTM,walk-forward,0.797,0.660,-0.0659,1.49

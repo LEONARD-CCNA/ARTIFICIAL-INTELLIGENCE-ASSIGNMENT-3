@@ -1,0 +1,607 @@
+<title>Kenya Commodity Price Forecasting — CPP 4103 Assignment 3</title>
+<style>
+  :root {
+    --page: #f9f9f7;
+    --surface: #fcfcfb;
+    --ink: #0b0b0b;
+    --ink-2: #52514e;
+    --muted: #898781;
+    --grid: #e1e0d9;
+    --baseline: #c3c2b7;
+    --border: rgba(11,11,11,0.10);
+    --accent: #2a78d6;
+    --s1: #2a78d6;  /* blue   — Linear Regression / diesel */
+    --s2: #1baf7a;  /* aqua   — Random Forest / maize */
+    --s3: #eda100;  /* yellow — LSTM / vegetable oil */
+    --s4: #008300;  /* green  — bread */
+    --naive: #898781;
+    --actual: #0b0b0b;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --page: #0d0d0d; --surface: #1a1a19;
+      --ink: #ffffff; --ink-2: #c3c2b7; --muted: #898781;
+      --grid: #2c2c2a; --baseline: #383835; --border: rgba(255,255,255,0.10);
+      --accent: #3987e5;
+      --s1: #3987e5; --s2: #199e70; --s3: #c98500; --s4: #008300;
+      --naive: #898781; --actual: #ffffff;
+    }
+  }
+  :root[data-theme="dark"] {
+    --page: #0d0d0d; --surface: #1a1a19;
+    --ink: #ffffff; --ink-2: #c3c2b7; --muted: #898781;
+    --grid: #2c2c2a; --baseline: #383835; --border: rgba(255,255,255,0.10);
+    --accent: #3987e5;
+    --s1: #3987e5; --s2: #199e70; --s3: #c98500; --s4: #008300;
+    --naive: #898781; --actual: #ffffff;
+  }
+  :root[data-theme="light"] {
+    --page: #f9f9f7; --surface: #fcfcfb;
+    --ink: #0b0b0b; --ink-2: #52514e; --muted: #898781;
+    --grid: #e1e0d9; --baseline: #c3c2b7; --border: rgba(11,11,11,0.10);
+    --accent: #2a78d6;
+    --s1: #2a78d6; --s2: #1baf7a; --s3: #eda100; --s4: #008300;
+    --naive: #898781; --actual: #0b0b0b;
+  }
+
+  html, body { background: var(--page); color: var(--ink); }
+  body {
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    font-size: 15px; line-height: 1.55; margin: 0;
+  }
+  .wrap { max-width: 1060px; margin: 0 auto; padding: 40px 24px 72px; }
+
+  .eyebrow {
+    font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase;
+    color: var(--ink-2); font-weight: 600;
+  }
+  h1 {
+    font-size: 30px; line-height: 1.2; margin: 10px 0 6px; font-weight: 700;
+    text-wrap: balance; letter-spacing: -0.01em;
+  }
+  .sub { color: var(--ink-2); max-width: 62ch; margin: 0 0 14px; }
+  .members { font-size: 13px; color: var(--muted); }
+  .members b { color: var(--ink-2); font-weight: 600; }
+
+  section { border-top: 1px solid var(--grid); margin-top: 40px; padding-top: 28px; }
+  h2 { font-size: 19px; margin: 4px 0 4px; font-weight: 700; letter-spacing: -0.005em; }
+  .lede { color: var(--ink-2); max-width: 68ch; margin: 0 0 18px; }
+  p { max-width: 68ch; }
+
+  .tiles { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin: 26px 0 0; }
+  .tile {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
+    padding: 14px 16px;
+  }
+  .tile .v { font-size: 26px; font-weight: 700; letter-spacing: -0.01em; }
+  .tile .k { font-size: 12.5px; color: var(--ink-2); margin-top: 2px; }
+
+  .card {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
+    padding: 18px 18px 12px; position: relative;
+  }
+  .card h3 { font-size: 14px; margin: 0 0 2px; font-weight: 650; }
+  .card .note { font-size: 12.5px; color: var(--muted); margin: 0 0 10px; }
+
+  .legend { display: flex; flex-wrap: wrap; gap: 14px; margin: 8px 0 4px; font-size: 12.5px; color: var(--ink-2); }
+  .legend .chip { display: inline-flex; align-items: center; gap: 6px; }
+  .legend .sw { width: 14px; height: 3px; border-radius: 2px; display: inline-block; }
+  .legend .sw.dashed { background: repeating-linear-gradient(90deg, currentColor 0 3px, transparent 3px 6px); height: 3px; }
+
+  .grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+  .grid2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; }
+  @media (max-width: 860px) {
+    .grid3, .grid2, .tiles { grid-template-columns: 1fr; }
+  }
+
+  svg { display: block; width: 100%; height: auto; }
+  svg text { font-family: system-ui, -apple-system, "Segoe UI", sans-serif; }
+  .axis-t { font-size: 11px; fill: var(--muted); font-variant-numeric: tabular-nums; }
+  .dlab { font-size: 11.5px; font-weight: 600; fill: var(--ink-2); }
+  .vlab { font-size: 11px; fill: var(--ink-2); font-variant-numeric: tabular-nums; }
+
+  .tip {
+    position: absolute; pointer-events: none; z-index: 5; display: none;
+    background: var(--surface); border: 1px solid var(--border); border-radius: 6px;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.13);
+    padding: 8px 10px; font-size: 12px; min-width: 150px;
+  }
+  .tip .tm { font-weight: 650; margin-bottom: 4px; }
+  .tip .tr { display: flex; justify-content: space-between; gap: 14px; }
+  .tip .tr span:last-child { font-variant-numeric: tabular-nums; font-weight: 600; }
+  .tip .tsw { display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-right: 5px; }
+
+  table { border-collapse: collapse; width: 100%; font-size: 13px; }
+  th, td { text-align: right; padding: 6px 10px; border-bottom: 1px solid var(--grid); font-variant-numeric: tabular-nums; }
+  th:first-child, td:first-child { text-align: left; }
+  th { font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); font-weight: 600; border-bottom: 1px solid var(--baseline); }
+  td.best { font-weight: 700; }
+  tr.chead td { text-align: left; font-weight: 650; color: var(--ink-2); background: transparent; padding-top: 12px; font-size: 12.5px; }
+  .tbl-scroll { overflow-x: auto; }
+
+  .mcards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-top: 14px; }
+  @media (max-width: 860px) { .mcards { grid-template-columns: 1fr; } }
+  .mcard { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 16px; }
+  .mcard h3 { margin: 0 0 6px; font-size: 14.5px; display: flex; align-items: center; gap: 8px; }
+  .mcard h3 .dot { width: 10px; height: 10px; border-radius: 3px; flex: none; }
+  .mcard p { font-size: 13px; color: var(--ink-2); margin: 0; }
+
+  ul.findings { padding-left: 20px; max-width: 72ch; }
+  ul.findings li { margin-bottom: 10px; }
+  ul.findings li::marker { color: var(--accent); }
+
+  code, .mono { font-family: ui-monospace, Consolas, monospace; font-size: 0.92em; }
+  pre {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
+    padding: 12px 14px; overflow-x: auto; font-size: 13px;
+  }
+  a { color: var(--accent); }
+  .src { font-size: 13px; color: var(--ink-2); }
+  .src li { margin-bottom: 4px; }
+</style>
+
+<div class="wrap">
+  <header>
+    <div class="eyebrow">KCA University &middot; CPP 4103 Artificial Intelligence Programming &middot; Assignment 3 &middot; Group A</div>
+    <h1>Predicting Kenyan Commodity Prices from Fuel Prices &amp; Economic Indicators</h1>
+    <p class="sub">Three machine-learning models — Linear Regression, Random Forest, and an LSTM network —
+      implemented <b>entirely from scratch in Common Lisp</b> and trained on real Nairobi market data
+      downloaded from the World Food Programme and the World Bank.</p>
+    <div class="members"><b>Group A:</b> Ndiang'ui Faith Wambui (24/02905) &middot; Gichia Samwel Mbugua (24/02792) &middot; Kiprotich Leonard (24/02106) &middot; Muema Felix Nasia (24/02335) &middot; Namusasi Gabriel Wanga (20/00927)</div>
+
+    <div class="tiles">
+      <div class="tile"><div class="v">78</div><div class="k">months of real Nairobi data (Jul 2014 – Dec 2020)</div></div>
+      <div class="tile"><div class="v">3 + 1</div><div class="k">models trained &amp; compared, plus a naive baseline</div></div>
+      <div class="tile"><div class="v">19</div><div class="k">engineered features (fuel, macro, lags, seasonality)</div></div>
+      <div class="tile"><div class="v">0</div><div class="k">external libraries — pure Common Lisp (SBCL)</div></div>
+    </div>
+  </header>
+
+  <section>
+    <div class="eyebrow">1 &middot; The data</div>
+    <h2>Fuel and food prices move together — but not in a straight line</h2>
+    <p class="lede">All series indexed to July 2014 = 100. Diesel collapsed with world oil in 2014–16 while
+      maize followed drought cycles (the 2017 <i>unga</i> crisis is the spike); vegetable oil fell sharply
+      during the 2020 COVID shock. This is why simple correlations understate the fuel–food link.</p>
+    <div class="card">
+      <h3>Nairobi prices, indexed (Jul 2014 = 100)</h3>
+      <p class="note">Monthly. Sources: WFP price monitors (via Humanitarian Data Exchange); hover for values.</p>
+      <div class="legend" id="lg-overview"></div>
+      <div id="ch-overview"></div>
+    </div>
+  </section>
+
+  <section>
+    <div class="eyebrow">2 &middot; The method</div>
+    <h2>Three models, written from first principles in Lisp</h2>
+    <p class="lede">Each model consumes the same 19 features per month: current fuel prices (diesel, petrol,
+      kerosene, composite index, petrol/diesel ratio), diesel lags 1–3, momentum terms, CPI, year-on-year
+      inflation, USD/KES, the commodity's own lags 1–3, and seasonal sin/cos encodings. Scalers are fitted
+      on training months only — no leakage. Evaluation uses a strict temporal split (60 train / 15 test)
+      plus walk-forward validation, where every model is retrained each test month.</p>
+    <div class="mcards">
+      <div class="mcard">
+        <h3><span class="dot" style="background:var(--s1)"></span>Linear Regression (Ridge)</h3>
+        <p>Ordinary least squares with an L2 penalty (&lambda; = 1.0), solved via the normal equations and
+           Gaussian elimination with partial pivoting. The interpretability baseline.</p>
+      </div>
+      <div class="mcard">
+        <h3><span class="dot" style="background:var(--s2)"></span>Random Forest</h3>
+        <p>200 CART regression trees grown on bootstrap samples with feature subsampling
+           (mtry = &radic;p), max depth 10, min leaf 2. Provides impurity-based feature importance.</p>
+      </div>
+      <div class="mcard">
+        <h3><span class="dot" style="background:var(--s3)"></span>LSTM Network</h3>
+        <p>Input/forget/output gates and memory cell with a 3-month lookback, trained by hand-derived
+           backpropagation-through-time with the Adam optimizer. 8 hidden units — sized to the data.</p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="eyebrow">3 &middot; Predictions</div>
+    <h2>Test window: October 2019 – December 2020 (walk-forward)</h2>
+    <p class="lede">Each point is a genuine one-month-ahead forecast from a model retrained on all history
+      up to that month. The window deliberately includes the COVID-19 shock — the hardest possible test.</p>
+    <div class="legend" id="lg-pred"></div>
+    <div class="grid3">
+      <div class="card"><h3>Maize (KG, wholesale)</h3><p class="note">KES per kg</p><div id="ch-maize"></div></div>
+      <div class="card"><h3>Vegetable oil (1L, retail)</h3><p class="note">KES per litre</p><div id="ch-oil"></div></div>
+      <div class="card"><h3>Bread (400g, retail)</h3><p class="note">KES per loaf</p><div id="ch-bread"></div></div>
+    </div>
+  </section>
+
+  <section>
+    <div class="eyebrow">4 &middot; Model comparison</div>
+    <h2>Mean absolute percentage error, walk-forward</h2>
+    <p class="lede">Lower is better. The models add value over naive persistence — Random Forest on maize,
+      Linear Regression on vegetable oil, LSTM on bread — but persistence is genuinely hard to beat on
+      monthly commodity prices: an honest, important finding.</p>
+    <div class="card">
+      <h3>MAPE by commodity and model (%)</h3>
+      <p class="note">Walk-forward protocol; hover bars for exact values.</p>
+      <div class="legend" id="lg-bars"></div>
+      <div id="ch-mape"></div>
+    </div>
+
+    <div class="grid2" style="margin-top:14px">
+      <div class="card">
+        <h3>Protocol B — walk-forward (primary)</h3>
+        <p class="note">Retrain on all months &lt; t, predict month t. Best RMSE per commodity in bold.</p>
+        <div class="tbl-scroll"><table id="tbl-wf"></table></div>
+      </div>
+      <div class="card">
+        <h3>Protocol A — fixed 80/20 temporal split</h3>
+        <p class="note">Train once on 2014-10 … 2019-09, test on 2019-10 … 2020-12.</p>
+        <div class="tbl-scroll"><table id="tbl-fs"></table></div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="eyebrow">5 &middot; What drives prices</div>
+    <h2>Random Forest feature importance</h2>
+    <p class="lede">Exchange rate and CPI carry the most signal, with diesel acting through its lagged
+      terms — consistent with the 1–3 month fuel-to-food transmission delay documented in the literature,
+      and with import dependence for vegetable oil.</p>
+    <div class="grid3">
+      <div class="card"><h3>Maize</h3><p class="note">share of split gain</p><div id="im-maize"></div></div>
+      <div class="card"><h3>Vegetable oil</h3><p class="note">share of split gain</p><div id="im-oil"></div></div>
+      <div class="card"><h3>Bread</h3><p class="note">share of split gain</p><div id="im-bread"></div></div>
+    </div>
+  </section>
+
+  <section>
+    <div class="eyebrow">6 &middot; Findings</div>
+    <h2>What the real data taught us</h2>
+    <ul class="findings">
+      <li><b>Models beat the naive baseline, modestly.</b> Walk-forward RMSE: Random Forest 3.91 vs naive 4.22 on maize;
+        Linear Regression 11.03 vs 12.75 on vegetable oil; LSTM 0.80 vs 0.89 on bread. Monthly prices are strongly
+        autoregressive, so persistence is a demanding yardstick.</li>
+      <li><b>Negative R&sup2; on maize/bread is a property of the test window, not a broken model.</b> Bread barely moved
+        during testing (tiny variance denominator: 1.5% MAPE still scores R&sup2; &lt; 0), and the window contains the
+        COVID-19 regime shift absent from training. MAPE and RMSE are the informative metrics here.</li>
+      <li><b>FX and CPI, not raw diesel, carry the most signal</b> — diesel matters through lags (lag-3 for oil) and
+        jointly with the macro variables, exactly the conditional transmission the literature describes.</li>
+      <li><b>Small data favors simple models.</b> With 60 training months, ridge regression is the most consistent;
+        the first LSTM (2&times;64/32 units as designed in Assignment 2) memorized the training set and had to be
+        reduced to 8 units — a live demonstration of the bias–variance trade-off.</li>
+      <li><b>Walk-forward &gt; fixed split for a deployed system.</b> Retraining monthly as EPRA/WFP publish new prices
+        improved every model — this is how the tool would actually operate.</li>
+    </ul>
+
+    <h2 style="margin-top:26px">Honest deviations from the Assignment 2 write-up</h2>
+    <ul class="findings">
+      <li><b>Bread replaces sugar</b> — sugar has no sustained Nairobi series in the WFP data; bread is the third
+        fuel-sensitive staple with 76/78 months of coverage.</li>
+      <li><b>Window 2014–2020 instead of 2019–2023</b> — Nairobi fuel monitoring in the WFP dataset ends Dec 2020;
+        78 observations beat 60.</li>
+      <li><b>LSTM reduced to one layer of 8 units</b> — the write-up's stacked 64/32 network overfit ~60 samples.</li>
+    </ul>
+  </section>
+
+  <section>
+    <div class="eyebrow">7 &middot; Reproduce it</div>
+    <h2>Run it yourself</h2>
+    <pre><code>cd assignment3
+sbcl --non-interactive --load run.lisp</code></pre>
+    <p class="src" style="margin-top:14px"><b>Data sources</b> (downloaded 2026-07-04):</p>
+    <ul class="src">
+      <li>WFP Food Prices — Kenya, via the <a href="https://data.humdata.org/dataset/wfp-food-prices-for-kenya">Humanitarian Data Exchange</a> (Nairobi market &amp; EPRA-regulated pump prices)</li>
+      <li>World Bank Global Economic Monitor API — Kenya monthly USD/KES (<span class="mono">DPANUSSPB</span>), CPI (<span class="mono">CPTOTNSXN</span>), y/y inflation (<span class="mono">CPTOTSAXNZGY</span>)</li>
+    </ul>
+    <p class="src">Deterministic run (seeded RNG). Code: <span class="mono">src/utils.lisp</span> (CSV, month math, Gaussian elimination),
+      <span class="mono">dataset.lisp</span> (features), <span class="mono">linreg.lisp</span>, <span class="mono">forest.lisp</span>,
+      <span class="mono">lstm.lisp</span> (BPTT + Adam), <span class="mono">main.lisp</span> (protocols &amp; reporting).</p>
+  </section>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  // ---------- data (generated by the Lisp pipeline, results/*.csv) ----------
+  var MONTHS_ALL = ["2014-07","2014-08","2014-09","2014-10","2014-11","2014-12","2015-01","2015-02","2015-03","2015-04","2015-05","2015-06","2015-07","2015-08","2015-09","2015-10","2015-11","2015-12","2016-01","2016-02","2016-03","2016-04","2016-05","2016-06","2016-07","2016-08","2016-09","2016-10","2016-11","2016-12","2017-01","2017-02","2017-03","2017-04","2017-05","2017-06","2017-07","2017-08","2017-09","2017-10","2017-11","2017-12","2018-01","2018-02","2018-03","2018-04","2018-05","2018-06","2018-07","2018-08","2018-09","2018-10","2018-11","2018-12","2019-01","2019-02","2019-03","2019-04","2019-05","2019-06","2019-07","2019-08","2019-09","2019-10","2019-11","2019-12","2020-01","2020-02","2020-03","2020-04","2020-05","2020-06","2020-07","2020-08","2020-09","2020-10","2020-11","2020-12"];
+  var DIESEL = [104.67,102.98,99.79,96.61,93.42,90.23,87.04,83.86,80.67,77.48,79.34,84.56,84.56,84.30,80.94,80.13,79.32,78.51,76.70,67.88,65.70,67.21,71.34,74.69,83.24,84.51,83.32,82.12,82.17,87.20,84.23,89.26,90.44,88.62,88.05,86.26,84.46,85.86,86.86,82.12,82.17,87.22,94.82,96.96,97.86,97.86,98.64,103.60,103.25,102.74,108.10,109.72,112.83,112.28,102.24,95.96,96.61,102.13,104.37,104.72,103.88,100.60,103.04,101.96,104.61,101.78,102.32,104.45,97.56,91.37,78.37,74.57,91.87,94.63,94.51,92.91,90.70,91.82];
+  var MAIZE = [28.39,25.94,29.29,26.12,25.57,26.39,27.57,25.48,25.57,32.77,35.40,35.56,36.92,38.20,35.69,33.18,32.47,31.77,31.23,31.09,30.43,31.05,30.81,32.18,31.96,29.96,30.01,32.59,32.00,31.80,31.86,40.52,44.99,45.00,49.20,56.00,54.05,45.58,42.40,37.74,39.94,40.73,42.27,36.86,32.97,32.81,32.64,32.52,30.19,28.00,26.20,22.17,23.43,24.46,27.11,27.08,26.13,31.30,34.74,26.85,45.29,37.71,36.45,41.26,39.91,38.34,36.85,36.64,31.38,34.66,33.76,32.86,31.96,42.45,33.17,33.97,33.77,33.77];
+  var OIL = [190.00,160.00,180.67,201.33,222.00,220.00,215.00,208.00,210.00,205.00,200.00,190.00,150.00,160.00,170.00,180.00,175.00,181.00,182.00,183.00,180.00,182.50,185.00,185.00,180.00,178.67,177.33,176.00,175.00,172.00,175.00,180.00,185.00,190.00,196.00,198.00,198.00,191.50,185.00,185.00,179.66,182.50,185.00,184.67,186.67,188.67,190.00,191.45,191.21,190.97,190.74,190.50,188.00,187.66,186.33,188.50,190.00,191.33,182.60,182.00,186.75,185.00,180.00,182.50,185.00,190.00,195.00,198.00,195.00,181.75,193.00,185.00,180.00,137.00,140.52,144.05,147.57,156.62];
+  var BREAD = [45,44,47,50,50,50,48,48,50,50,50,50,50,50,50,50,50,50,50,52,50,49,48,48,50,50,46,45,45,45,50,50,50,50,45,45,45,45,44,44,44,44,44,45,45,44,44,44,45,45,45,45,45,45,44,44,44,44,43,43,43,43,43,43,44,44,45,45,44,43,43,44,45,43,44,44,45,45];
+
+  var TEST_MONTHS = ["2019-10","2019-11","2019-12","2020-01","2020-02","2020-03","2020-04","2020-05","2020-06","2020-07","2020-08","2020-09","2020-10","2020-11","2020-12"];
+  var PRED = {
+    maize: {
+      actual: [41.26,39.91,38.34,36.85,36.64,31.38,34.66,33.76,32.86,31.96,42.45,33.17,33.97,33.77,33.77],
+      lr:     [33.85,37.09,36.69,39.35,39.23,36.35,35.42,35.64,35.43,36.11,30.18,36.27,33.43,34.37,34.45],
+      rf:     [36.70,35.23,35.51,37.03,35.89,38.16,35.36,34.32,35.13,35.77,34.23,38.05,37.35,36.14,35.51],
+      lstm:   [33.76,40.52,39.94,29.04,39.53,41.47,32.97,35.97,34.04,39.15,36.31,47.82,35.68,41.02,33.42]
+    },
+    oil: {
+      actual: [182.50,185.00,190.00,195.00,198.00,195.00,181.75,193.00,185.00,180.00,137.00,140.52,144.05,147.57,156.62],
+      lr:     [179.90,185.40,189.35,194.80,201.88,194.30,189.09,177.10,192.88,182.63,170.59,146.38,152.48,161.44,157.63],
+      rf:     [185.19,184.57,184.74,188.52,191.12,191.72,192.69,187.13,188.86,184.62,182.76,172.23,170.31,158.85,155.65],
+      lstm:   [181.14,182.38,186.37,188.53,194.85,192.00,193.89,184.55,192.15,186.82,181.44,151.27,165.59,162.01,151.39]
+    },
+    bread: {
+      actual: [43,44,44,45,45,44,43,43,44,45,43,44,44,45,45],
+      lr:     [42.88,42.49,43.74,43.40,43.82,42.72,41.91,42.19,41.87,41.76,44.72,41.98,43.61,43.94,44.75],
+      rf:     [43.42,43.27,43.63,43.96,44.64,44.51,44.53,43.96,44.92,44.47,44.71,44.07,44.33,44.27,44.60],
+      lstm:   [43.32,43.26,43.66,43.71,44.60,43.31,43.14,42.99,43.03,44.11,43.10,42.50,43.24,43.71,45.48]
+    }
+  };
+
+  var MAPE = {
+    labels: ["Maize", "Vegetable oil", "Bread"],
+    models: [
+      { name: "Naive",             cls: "naive", vals: [7.59, 5.05, 1.52] },
+      { name: "Linear Regression", cls: "s1",    vals: [8.75, 4.47, 2.82] },
+      { name: "Random Forest",     cls: "s2",    vals: [8.87, 7.28, 1.62] },
+      { name: "LSTM",              cls: "s3",    vals: [13.92, 6.49, 1.49] }
+    ]
+  };
+
+  var METRICS = {
+    wf: [
+      ["Maize (KG, wholesale)", [["Naive",4.22,2.76,-0.61,7.59],["Linear Regression",4.42,3.23,-0.76,8.75],["Random Forest",3.91,3.18,-0.38,8.87],["LSTM",6.32,4.86,-2.61,13.92]]],
+      ["Vegetable oil (1L, retail)", [["Naive",12.75,8.07,0.65,5.05],["Linear Regression",11.03,7.00,0.73,4.47],["Random Forest",16.82,11.09,0.38,7.28],["LSTM",14.58,10.08,0.54,6.49]]],
+      ["Bread (400g, retail)", [["Naive",0.89,0.67,-0.34,1.52],["Linear Regression",1.49,1.25,-2.72,2.82],["Random Forest",0.83,0.71,-0.17,1.62],["LSTM",0.80,0.66,-0.07,1.49]]]
+    ],
+    fs: [
+      ["Maize (KG, wholesale)", [["Naive",4.22,2.76,-0.61,7.59],["Linear Regression",4.56,3.42,-0.88,9.33],["Random Forest",4.49,4.27,-0.82,12.09],["LSTM",7.42,6.78,-3.98,19.36]]],
+      ["Vegetable oil (1L, retail)", [["Naive",12.75,8.07,0.65,5.05],["Linear Regression",11.47,8.03,0.71,5.13],["Random Forest",24.03,16.89,-0.26,11.16],["LSTM",24.12,16.59,-0.27,11.00]]],
+      ["Bread (400g, retail)", [["Naive",0.89,0.67,-0.34,1.52],["Linear Regression",2.10,1.82,-6.42,4.10],["Random Forest",0.87,0.71,-0.27,1.61],["LSTM",1.59,1.25,-3.25,2.80]]]
+    ]
+  };
+
+  var IMPORTANCE = {
+    maize: [["USD/KES",0.194],["price lag-1",0.188],["price lag-2",0.098],["inflation y/y",0.090],["price lag-3",0.055],["diesel lag-3",0.049]],
+    oil:   [["CPI",0.199],["price lag-1",0.159],["USD/KES",0.124],["diesel lag-3",0.082],["price lag-2",0.069],["diesel lag-2",0.047]],
+    bread: [["CPI",0.246],["price lag-1",0.191],["price lag-2",0.108],["petrol/diesel",0.107],["diesel",0.056],["kerosene",0.038]]
+  };
+
+  // ---------- helpers ----------
+  var NS = "http://www.w3.org/2000/svg";
+  function el(tag, attrs, parent) {
+    var e = document.createElementNS(NS, tag);
+    for (var k in attrs) e.setAttribute(k, attrs[k]);
+    if (parent) parent.appendChild(e);
+    return e;
+  }
+  function fmt(v, d) { return Number(v).toFixed(d === undefined ? 1 : d); }
+  function niceTicks(lo, hi, n) {
+    var span = hi - lo, step = Math.pow(10, Math.floor(Math.log(span / n) / Math.LN10));
+    var err = span / (n * step);
+    if (err >= 7.5) step *= 10; else if (err >= 3.5) step *= 5; else if (err >= 1.5) step *= 2;
+    var ticks = [], t = Math.ceil(lo / step) * step;
+    for (; t <= hi + 1e-9; t += step) ticks.push(+t.toFixed(6));
+    return ticks;
+  }
+  function cssVar(name) {
+    return "var(--" + name + ")";
+  }
+
+  // ---------- line chart with crosshair tooltip ----------
+  function lineChart(opts) {
+    var host = document.getElementById(opts.el);
+    var W = opts.w || 940, H = opts.h || 340;
+    var m = { t: 14, r: opts.mr || 14, b: 26, l: 44 };
+    var svg = el("svg", { viewBox: "0 0 " + W + " " + H }, host);
+    var iw = W - m.l - m.r, ih = H - m.t - m.b;
+    var xs = opts.months, n = xs.length;
+
+    var lo = Infinity, hi = -Infinity;
+    opts.series.forEach(function (s) { s.values.forEach(function (v) { if (v < lo) lo = v; if (v > hi) hi = v; }); });
+    var pad = (hi - lo) * 0.08 || 1; lo -= pad; hi += pad;
+    if (opts.zero) lo = Math.min(lo, 0);
+
+    function X(i) { return m.l + (n === 1 ? iw / 2 : i * iw / (n - 1)); }
+    function Y(v) { return m.t + ih - (v - lo) / (hi - lo) * ih; }
+
+    niceTicks(lo, hi, 4).forEach(function (t) {
+      el("line", { x1: m.l, x2: m.l + iw, y1: Y(t), y2: Y(t), stroke: cssVar("grid"), "stroke-width": 1 }, svg);
+      var tx = el("text", { x: m.l - 8, y: Y(t) + 3.5, "text-anchor": "end", "class": "axis-t" }, svg);
+      tx.textContent = fmt(t, t % 1 === 0 ? 0 : 1);
+    });
+    el("line", { x1: m.l, x2: m.l + iw, y1: m.t + ih, y2: m.t + ih, stroke: cssVar("baseline"), "stroke-width": 1 }, svg);
+
+    var every = opts.tickEvery || Math.max(1, Math.round(n / 6));
+    for (var i = 0; i < n; i += every) {
+      var tx2 = el("text", { x: X(i), y: m.t + ih + 17, "text-anchor": "middle", "class": "axis-t" }, svg);
+      tx2.textContent = opts.shortTicks ? xs[i].slice(2).replace("-", "/") : xs[i];
+    }
+
+    opts.series.forEach(function (s) {
+      var d = "";
+      s.values.forEach(function (v, i) { d += (i ? "L" : "M") + X(i).toFixed(1) + " " + Y(v).toFixed(1); });
+      var attrs = { d: d, fill: "none", "stroke-width": s.width || 2,
+                    "stroke-linejoin": "round", "stroke-linecap": "round",
+                    style: "stroke:" + cssVar(s.color) };
+      if (s.dash) attrs["stroke-dasharray"] = "4 4";
+      el("path", attrs, svg);
+      if (opts.endLabels) {
+        var last = s.values[n - 1];
+        var lb = el("text", { x: X(n - 1) + 6, y: Y(last) + 4, "class": "dlab", style: "fill:" + cssVar(s.color === "actual" ? "ink" : s.color) }, svg);
+        lb.textContent = s.name;
+      }
+    });
+
+    // crosshair + tooltip
+    var cross = el("line", { y1: m.t, y2: m.t + ih, stroke: cssVar("baseline"), "stroke-width": 1, opacity: 0 }, svg);
+    var dots = opts.series.map(function (s) {
+      return el("circle", { r: 3.5, opacity: 0, style: "fill:" + cssVar(s.color), stroke: cssVar("surface"), "stroke-width": 2 }, svg);
+    });
+    var tip = document.createElement("div");
+    tip.className = "tip"; host.parentNode.appendChild(tip);
+
+    svg.addEventListener("mousemove", function (ev) {
+      var r = svg.getBoundingClientRect();
+      var px = (ev.clientX - r.left) * W / r.width;
+      var i = Math.round((px - m.l) / (iw / (n - 1)));
+      if (i < 0) i = 0; if (i > n - 1) i = n - 1;
+      cross.setAttribute("x1", X(i)); cross.setAttribute("x2", X(i)); cross.setAttribute("opacity", 1);
+      var html = '<div class="tm">' + xs[i] + "</div>";
+      opts.series.forEach(function (s, k) {
+        dots[k].setAttribute("cx", X(i)); dots[k].setAttribute("cy", Y(s.values[i])); dots[k].setAttribute("opacity", 1);
+        html += '<div class="tr"><span><span class="tsw" style="background:' + cssVar(s.color) + '"></span>' + s.name + "</span><span>" + fmt(s.values[i], opts.tipDec === undefined ? 1 : opts.tipDec) + "</span></div>";
+      });
+      tip.innerHTML = html;
+      tip.style.display = "block";
+      var hostR = host.parentNode.getBoundingClientRect();
+      var tx = ev.clientX - hostR.left + 14, ty = ev.clientY - hostR.top + 8;
+      if (tx + 180 > hostR.width) tx -= 200;
+      tip.style.left = tx + "px"; tip.style.top = ty + "px";
+    });
+    svg.addEventListener("mouseleave", function () {
+      cross.setAttribute("opacity", 0); dots.forEach(function (d) { d.setAttribute("opacity", 0); });
+      tip.style.display = "none";
+    });
+  }
+
+  // ---------- grouped bar chart ----------
+  function barChart(opts) {
+    var host = document.getElementById(opts.el);
+    var W = 940, H = 300, m = { t: 18, r: 10, b: 26, l: 40 };
+    var svg = el("svg", { viewBox: "0 0 " + W + " " + H }, host);
+    var iw = W - m.l - m.r, ih = H - m.t - m.b;
+    var groups = opts.labels.length, bars = opts.models.length;
+    var hi = 0;
+    opts.models.forEach(function (mo) { mo.vals.forEach(function (v) { if (v > hi) hi = v; }); });
+    hi *= 1.15;
+    function Y(v) { return m.t + ih - v / hi * ih; }
+
+    niceTicks(0, hi, 4).forEach(function (t) {
+      el("line", { x1: m.l, x2: m.l + iw, y1: Y(t), y2: Y(t), stroke: cssVar("grid"), "stroke-width": 1 }, svg);
+      var tx = el("text", { x: m.l - 8, y: Y(t) + 3.5, "text-anchor": "end", "class": "axis-t" }, svg);
+      tx.textContent = fmt(t, 0);
+    });
+    el("line", { x1: m.l, x2: m.l + iw, y1: m.t + ih, y2: m.t + ih, stroke: cssVar("baseline"), "stroke-width": 1 }, svg);
+
+    var gw = iw / groups, bw = Math.min(46, (gw * 0.7) / bars);
+    var tip = document.createElement("div");
+    tip.className = "tip"; host.parentNode.appendChild(tip);
+
+    opts.labels.forEach(function (lab, gi) {
+      var cx = m.l + gw * gi + gw / 2;
+      var tx = el("text", { x: cx, y: m.t + ih + 18, "text-anchor": "middle", "class": "axis-t", "font-size": 12 }, svg);
+      tx.textContent = lab;
+      opts.models.forEach(function (mo, bi) {
+        var x = cx - (bars * bw + (bars - 1) * 2) / 2 + bi * (bw + 2);
+        var y = Y(mo.vals[gi]), h = m.t + ih - y;
+        var rect = el("path", {
+          d: "M" + x + " " + (m.t + ih) + " L" + x + " " + (y + 4) + " Q" + x + " " + y + " " + (x + 4) + " " + y +
+             " L" + (x + bw - 4) + " " + y + " Q" + (x + bw) + " " + y + " " + (x + bw) + " " + (y + 4) +
+             " L" + (x + bw) + " " + (m.t + ih) + " Z",
+          style: "fill:" + cssVar(mo.cls)
+        }, svg);
+        var vl = el("text", { x: x + bw / 2, y: y - 5, "text-anchor": "middle", "class": "vlab" }, svg);
+        vl.textContent = fmt(mo.vals[gi], 1);
+        rect.addEventListener("mousemove", function (ev) {
+          tip.innerHTML = '<div class="tm">' + lab + "</div>" +
+            '<div class="tr"><span><span class="tsw" style="background:' + cssVar(mo.cls) + '"></span>' + mo.name + "</span><span>" + fmt(mo.vals[gi], 2) + "%</span></div>";
+          tip.style.display = "block";
+          var hostR = host.parentNode.getBoundingClientRect();
+          tip.style.left = (ev.clientX - hostR.left + 14) + "px";
+          tip.style.top = (ev.clientY - hostR.top + 8) + "px";
+        });
+        rect.addEventListener("mouseleave", function () { tip.style.display = "none"; });
+      });
+    });
+  }
+
+  // ---------- horizontal importance bars ----------
+  function hbars(elId, items) {
+    var host = document.getElementById(elId);
+    var W = 300, rowH = 26, m = { t: 4, r: 40, b: 4, l: 92 };
+    var H = m.t + m.b + items.length * rowH;
+    var svg = el("svg", { viewBox: "0 0 " + W + " " + H }, host);
+    var iw = W - m.l - m.r;
+    var hi = items[0][1];
+    items.forEach(function (it, i) {
+      var y = m.t + i * rowH;
+      var lab = el("text", { x: m.l - 8, y: y + rowH / 2 + 4, "text-anchor": "end", "class": "axis-t", "font-size": 11.5 }, svg);
+      lab.textContent = it[0];
+      var w = it[1] / hi * iw;
+      el("path", {
+        d: "M" + m.l + " " + (y + 5) + " L" + (m.l + w - 4) + " " + (y + 5) +
+           " Q" + (m.l + w) + " " + (y + 5) + " " + (m.l + w) + " " + (y + 9) +
+           " L" + (m.l + w) + " " + (y + rowH - 9) +
+           " Q" + (m.l + w) + " " + (y + rowH - 5) + " " + (m.l + w - 4) + " " + (y + rowH - 5) +
+           " L" + m.l + " " + (y + rowH - 5) + " Z",
+        style: "fill:" + cssVar("s1")
+      }, svg);
+      var vl = el("text", { x: m.l + w + 6, y: y + rowH / 2 + 4, "class": "vlab" }, svg);
+      vl.textContent = fmt(it[1], 2);
+    });
+  }
+
+  // ---------- legends ----------
+  function legend(elId, entries) {
+    var host = document.getElementById(elId);
+    entries.forEach(function (e) {
+      var chip = document.createElement("span");
+      chip.className = "chip";
+      chip.innerHTML = '<span class="sw' + (e.dash ? " dashed" : "") + '" style="' +
+        (e.dash ? "color:" : "background:") + cssVar(e.color) + '"></span>' + e.name;
+      host.appendChild(chip);
+    });
+  }
+
+  // ---------- metrics tables ----------
+  function metricsTable(elId, data) {
+    var t = document.getElementById(elId);
+    var html = "<thead><tr><th>Model</th><th>RMSE</th><th>MAE</th><th>R&sup2;</th><th>MAPE%</th></tr></thead><tbody>";
+    data.forEach(function (grp) {
+      html += '<tr class="chead"><td colspan="5">' + grp[0] + "</td></tr>";
+      var best = Math.min.apply(null, grp[1].map(function (r) { return r[1]; }));
+      grp[1].forEach(function (r) {
+        html += "<tr><td>" + r[0] + "</td><td" + (r[1] === best ? ' class="best"' : "") + ">" + fmt(r[1], 2) +
+          "</td><td>" + fmt(r[2], 2) + "</td><td>" + fmt(r[3], 2) + "</td><td>" + fmt(r[4], 1) + "</td></tr>";
+      });
+    });
+    t.innerHTML = html + "</tbody>";
+  }
+
+  // ---------- build the page ----------
+  function indexed(arr) { var b = arr[0]; return arr.map(function (v) { return v / b * 100; }); }
+
+  legend("lg-overview", [
+    { name: "Diesel (pump)", color: "s1" }, { name: "Maize (wholesale)", color: "s2" },
+    { name: "Vegetable oil", color: "s3" }, { name: "Bread", color: "s4" }
+  ]);
+  lineChart({
+    el: "ch-overview", months: MONTHS_ALL, h: 360, tickEvery: 12, tipDec: 1,
+    series: [
+      { name: "Diesel", values: indexed(DIESEL), color: "s1" },
+      { name: "Maize", values: indexed(MAIZE), color: "s2" },
+      { name: "Veg. oil", values: indexed(OIL), color: "s3" },
+      { name: "Bread", values: indexed(BREAD), color: "s4" }
+    ]
+  });
+
+  legend("lg-pred", [
+    { name: "Actual", color: "actual" }, { name: "Linear Regression", color: "s1" },
+    { name: "Random Forest", color: "s2" }, { name: "LSTM", color: "s3" }
+  ]);
+  [["ch-maize", "maize", 0], ["ch-oil", "oil", 0], ["ch-bread", "bread", 1]].forEach(function (spec) {
+    var d = PRED[spec[1]];
+    lineChart({
+      el: spec[0], months: TEST_MONTHS, w: 320, h: 230, tickEvery: 5, shortTicks: true, tipDec: spec[2] ? 2 : 1,
+      series: [
+        { name: "Actual", values: d.actual, color: "actual", width: 2.6 },
+        { name: "Linear Regression", values: d.lr, color: "s1" },
+        { name: "Random Forest", values: d.rf, color: "s2" },
+        { name: "LSTM", values: d.lstm, color: "s3" }
+      ]
+    });
+  });
+
+  legend("lg-bars", MAPE.models.map(function (m) { return { name: m.name, color: m.cls }; }));
+  barChart({ el: "ch-mape", labels: MAPE.labels, models: MAPE.models });
+
+  metricsTable("tbl-wf", METRICS.wf);
+  metricsTable("tbl-fs", METRICS.fs);
+
+  hbars("im-maize", IMPORTANCE.maize);
+  hbars("im-oil", IMPORTANCE.oil);
+  hbars("im-bread", IMPORTANCE.bread);
+})();
+</script>
